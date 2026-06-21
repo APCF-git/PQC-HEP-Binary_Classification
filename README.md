@@ -161,6 +161,18 @@ Before training begins, each parameter θₖ is automatically classified by the 
 feeds, and the correct gradient rule is applied per parameter. An unrecognised gate type
 raises a `ValueError` immediately — there is no silent failure.
 
+### Simulation modes (Qiskit only)
+
+The Qiskit implementation supports two simulation modes controlled by `USE_STATEVECTOR`:
+
+- **`USE_STATEVECTOR = True`**: Computes P(|1⟩) exactly using the full quantum state vector.
+  No measurement shot noise — gradients are exact and training curves are perfectly smooth.
+  Recommended for studying convergence behaviour and producing clean loss curves.
+
+- **`USE_STATEVECTOR = False`**: Estimates P(|1⟩) from `Nm` measurement shots.
+  Introduces statistical shot noise in each gradient estimate, simulating what would occur
+  on real quantum hardware. Set `Nm ≥ 1000` for reasonable gradient estimates.
+
 ---
 
 ## Requirements
@@ -285,21 +297,23 @@ python3 PQC_HEP_training_file_pytket.py
 ## Key USER SETTINGS
 
 The following settings have the most significant impact on training. All settings are
-documented in detail within each training file.
+documented in full detail within each training file. Default values in the files are
+configured for quick testing; for a full training run, set `MAX_EVENTS = None` to use
+all available data.
 
-| Setting | Description | Recommended starting value |
-|---|---|---|
-| `CIRCUIT_NUMBER` | Variational form template (1–19) | `2` |
-| `N_LAYERS` | Number of variational block repetitions | `1` |
-| `MAX_EVENTS` | Number of training events to use | `2000` |
-| `BALANCE_CLASSES` | Equal signal and background counts | `True` |
-| `N_ITER` | Number of full passes over training events | `100` |
-| `BATCH_SIZE` | Events per mini-batch | `100` |
-| `ALPHA` | Adam learning rate | `0.05` |
-| `USE_STATEVECTOR` | Exact evaluation (Qiskit only) | `True` |
-| `Nm` | Shots per circuit evaluation (shot-based mode) | `1000` |
-| `GLOBAL_EVAL_STEP` | Checkpoint interval (passes) for global loss | `5` |
-| `RUN_TAG` | Optional prefix for the output folder name | `None` |
+| Setting | Description | Default (testing) | Full run |
+|---|---|---|---|
+| `CIRCUIT_NUMBER` | Variational form template (1–19, see circuit selection below) | `2` | any |
+| `N_LAYERS` | Number of variational block repetitions per pass | `1` | `1` or higher |
+| `MAX_EVENTS` | Total training events; `None` uses all available | test value | `None` |
+| `BALANCE_CLASSES` | Use equal signal and background event counts | `True` | `True` |
+| `N_ITER` | Full passes over all training events (epochs) | test value | depends on compute |
+| `BATCH_SIZE` | Events per mini-batch gradient update | `100` | `100`–`1000` |
+| `ALPHA` | Adam learning rate | `0.01` | tune per circuit |
+| `USE_STATEVECTOR` | Exact P(\|1⟩) without shot noise — Qiskit only | `True` | `True` or `False` |
+| `Nm` | Shots per evaluation when `USE_STATEVECTOR=False` | `1000` | `1000`+ |
+| `GLOBAL_EVAL_STEP` | Evaluate loss over all events every N passes | `5` | `5`–`20` |
+| `RUN_TAG` | Optional string prepended to the output folder name | `None` | `None` |
 
 ### Selecting a circuit
 
