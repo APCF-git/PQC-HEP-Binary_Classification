@@ -127,7 +127,7 @@ Training uses **mini-batch gradient descent** with one Adam optimiser step per b
 1. Forward pass: evaluate P(|1⟩) for all events in the batch at the current θ.
 2. Batch loss: weighted binary cross-entropy averaged over the batch:
 
-$$L_K = \frac{1}{N} \sum_{i=1}^{N} w_i \left[ -z_i \ln y_i - (1 - z_i) \ln(1 - y_i) \right]$$
+$$L_K = -\frac{1}{N} \sum_{i=1}^{N} w_i \left[ z_i \ln y_i + (1 - z_i) \ln(1 - y_i) \right]$$
 
 3. Gradient: computed exactly via the **parameter shift rule**:
    - **Two-term rule** for Rx(θ), Ry(θ), Rz(θ) (generator eigenvalues {+1, −1}):
