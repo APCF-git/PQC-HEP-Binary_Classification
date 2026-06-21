@@ -171,11 +171,11 @@ BATCH_SIZE             = 100     # exact events per batch (int >= 1) or fraction
 # Uses constant beta_1/beta_2 as EMA decay coefficients.
 # NOTE: this is NOT the time-varying e^{-beta*t} formulation from the supervisor's
 # NN.pdf. Confirm with your supervisor which formulation is intended.
-ALPHA   = 5e-2    # learning rate
+ALPHA   = 1e-2    # learning rate
 BETA1   = 0.9     # first-moment EMA decay coefficient (standard default)
 BETA2   = 0.999   # second-moment EMA decay coefficient (standard default)
 EPSILON = 1e-8    # numerical stability constant
-THETA_INIT_SEED = 21     # seed for the initial theta values; None = random
+THETA_INIT_SEED = 42     # seed for the initial theta values; None = random
 
 # Evaluation checkpoints.
 # Specifies when to pause training and record the loss (during and after).
