@@ -306,7 +306,7 @@ all available data.
 | `CIRCUIT_NUMBER` | Variational form template (1–19, see circuit selection below) | `2` | any |
 | `N_LAYERS` | Number of variational block repetitions per pass | `1` | `1` or higher |
 | `MAX_EVENTS` | Total training events; `None` uses all available | test value | `None` |
-| `BALANCE_CLASSES` | Use equal signal and background event counts | `True` | `True` |
+| `BALANCE_CLASSES` | Use equal signal and background event counts (no effect when `MAX_EVENTS=None`) | `True` | no effect |
 | `N_ITER` | Full passes over all training events (epochs) | test value | depends on compute |
 | `BATCH_SIZE` | Events per mini-batch gradient update | `100` | `100`–`1000` |
 | `ALPHA` | Adam learning rate | `0.01` | tune per circuit |
