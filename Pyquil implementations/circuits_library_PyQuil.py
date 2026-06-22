@@ -8,15 +8,7 @@ Affiliation: Student at Instituto Superior Técnico, Universidade de Lisboa
 
 Description:
     Defines 19 parameterized ansatz circuits for use as W(theta) in the PQC pipeline.
-
-Reference:
-    Sim, S., Johnson, P. D., & Aspuru-Guzik, A. (2019).
-    "Expressibility and Entangling Capability of Parameterized Quantum
-    Circuits for Hybrid Quantum-Classical Algorithms."
-    Advanced Quantum Technologies, 2(12), 1900070.
-    https://doi.org/10.1002/qute.201900070
-
-    Circuit templates and numbering follow Figure 2 (page 7).
+    Circuit templates follow Figure 2 of Sim et al. (2019) — see references in README.md.
 
 Each circuit function has the following signature:
     circuit_N(p, theta, n_layers) -> Program

@@ -20,10 +20,10 @@ Four implementations are provided across two quantum computing frameworks:
 
 | Implementation | Framework | Embedding method | Real hardware |
 |---|---|---|---|
-| **Qiskit** *(primary)* | Qiskit / IBM | `StatePreparation` | ✓ IBM Quantum (via `IBM_BACKEND`) |
-| Gram-Schmidt | PyQuil / Rigetti | Custom 16×16 unitary (Gram-Schmidt) | ✗ |
-| QR decomposition | PyQuil / Rigetti | Custom 16×16 unitary (QR) | ✗ |
-| Pytket | PyQuil / Rigetti | Qiskit → Pytket → PyQuil (native gates) | ✓ Rigetti QPU (via `QUANTUM_COMPUTER`) |
+| **Qiskit** *(primary)* | Qiskit [6] / IBM | `StatePreparation` | ✓ IBM Quantum (via `IBM_BACKEND`) |
+| Gram-Schmidt | PyQuil [8] / Rigetti | Custom 16×16 unitary (Gram-Schmidt) | ✗ |
+| QR decomposition | PyQuil [8] / Rigetti | Custom 16×16 unitary (QR) | ✗ |
+| Pytket [7] | PyQuil [8] / Rigetti | Qiskit → Pytket → PyQuil (native gates) | ✓ Rigetti QPU (via `QUANTUM_COMPUTER`) |
 
 ---
 
@@ -72,7 +72,7 @@ The Qiskit implementation is recommended as the main version for the following r
    entire batches of circuits in a single `backend.run()` call, eliminating per-circuit
    Python overhead.
 
-4. **Ecosystem maturity**: Qiskit is the most actively developed and widely used quantum
+4. **Ecosystem maturity**: Qiskit [6] is the most actively developed and widely used quantum
    computing framework, with extensive documentation, hardware support, and community resources.
 
 ---
@@ -86,9 +86,9 @@ The three PyQuil implementations are included for the following reasons:
    to explore whether the choice of unitary construction method affects training behaviour,
    providing a direct comparison against the Qiskit StatePreparation approach.
 
-2. **Cross-framework portability**: The Pytket implementation demonstrates that the same PQC
+2. **Cross-framework portability**: The Pytket [7] implementation demonstrates that the same PQC
    algorithm can be expressed across multiple quantum computing frameworks by using
-   Pytket as a transpilation layer (Qiskit → Pytket → PyQuil), rebasing the embedding
+   Pytket as a transpilation layer (Qiskit → Pytket → PyQuil [8]), rebasing the embedding
    to native Rigetti gates {Rx, Rz, CZ}.
 
 3. **Rigetti hardware support (Pytket only)**: The Pytket implementation can run on real
@@ -116,7 +116,7 @@ Each circuit consists of two parts applied sequentially to a 4-qubit register:
    normalised to unit L2 norm, encoding them as the amplitudes of a quantum state |ψ⟩.
 2. **Variational form W(θ)**: A parameterised circuit of rotation gates (Rx, Ry, Rz and
    optionally CRx, CRy, CRz) with trainable parameters θ. 19 circuit templates are available,
-   numbered following Figure 2 of Sim et al. (2019).
+   numbered following Figure 2 of Sim et al. (2019) [5].
 
 The classifier output is the measurement probability P(qubit 0 = |1⟩).
 
@@ -130,17 +130,17 @@ Training uses **mini-batch gradient descent** with one Adam optimiser step per b
 $$L_K = -\frac{1}{N} \sum_{i=1}^{N} w_i \left[ z_i \ln y_i + (1 - z_i) \ln(1 - y_i) \right]$$
 
 3. Gradient: computed exactly via the **parameter shift rule**:
-   - **Two-term rule** for Rx(θ), Ry(θ), Rz(θ) (generator eigenvalues {+1, −1}):
+   - **Two-term rule** for Rx(θ), Ry(θ), Rz(θ) (generator eigenvalues {+1, −1}) (see [1], [2]):
 
 $$\frac{\partial f}{\partial \theta_k} = \frac{f(\theta + \tfrac{\pi}{2} e_k) - f(\theta - \tfrac{\pi}{2} e_k)}{2}$$
 
-   - **Four-term rule** for CRx(θ), CRy(θ), CRz(θ) (generator eigenvalues {−1, 0, +1}):
+   - **Four-term rule** for CRx(θ), CRy(θ), CRz(θ) (generator eigenvalues {−1, 0, +1}) (see [3]):
 
 $$\frac{\partial f}{\partial \theta_k} = d_1 \left[ f(\theta + \tfrac{\pi}{2} e_k) - f(\theta - \tfrac{\pi}{2} e_k) \right] - d_2 \left[ f(\theta + \pi e_k) - f(\theta - \pi e_k) \right]$$
 
 where $d_1 = \tfrac{1}{2}$, $d_2 = \tfrac{\sqrt{2}-1}{4}$ (Anselmetti et al. 2021, Appendix F.2, Eq. F15).
 
-4. Optimiser update: **Adam** (Kingma & Ba 2014, standard constant-β₁/β₂ formulation,
+4. Optimiser update: **Adam** [4] (Kingma & Ba 2014, standard constant-β₁/β₂ formulation,
    implemented via `sklearn.neural_network._stochastic_optimizers.AdamOptimizer`).
 
 ### Weight normalisation
@@ -297,33 +297,30 @@ python3 PQC_HEP_training_file_pytket.py
 ## Key USER SETTINGS
 
 The following settings have the most significant impact on training. All settings are
-documented in full detail within each training file. Default values in the files are
-configured for quick testing; for a full training run, set `MAX_EVENTS = None` to use
-all available data.
+documented in full detail within each training file.
 
-| Setting | Description | Default (testing) | Full run |
-|---|---|---|---|
-| `CIRCUIT_NUMBER` | Variational form template (1–19, see circuit selection below) | `2` | any |
-| `N_LAYERS` | Number of variational block repetitions per pass | `1` | `1` or higher |
-| `MAX_EVENTS` | Total training events; `None` uses all available | test value | `None` |
-| `BALANCE_CLASSES` | Use equal signal and background event counts (no effect when `MAX_EVENTS=None`) | `True` | no effect |
-| `N_ITER` | Full passes over all training events (epochs) | test value | depends on compute |
-| `BATCH_SIZE` | Events per mini-batch gradient update | `100` | `100`–`1000` |
-| `ALPHA` | Adam learning rate | `0.01` | tune per circuit |
-| `USE_STATEVECTOR` | Exact P(\|1⟩) without shot noise — Qiskit only | `True` | `True` or `False` |
-| `Nm` | Shots per evaluation when `USE_STATEVECTOR=False` | `1000` | `1000`+ |
-| `GLOBAL_EVAL_STEP` | Evaluate loss over all events every N passes | `5` | `5`–`20` |
-| `RUN_TAG` | Optional string prepended to the output folder name | `None` | `None` |
+| Setting | Description |
+|---|---|
+| `CIRCUIT_NUMBER` | Variational form template (1–19, see circuit selection below) |
+| `N_LAYERS` | Number of variational block repetitions per pass |
+| `MAX_EVENTS` | Total training events; `None` uses all available |
+| `BALANCE_CLASSES` | Use equal signal and background event counts; no effect when `MAX_EVENTS=None` |
+| `N_ITER` | Full passes over all training events (epochs) |
+| `BATCH_SIZE` | Events per mini-batch gradient update |
+| `ALPHA` | Adam learning rate |
+| `USE_STATEVECTOR` | Exact P(\|1⟩) without shot noise — Qiskit only |
+| `Nm` | Shots per evaluation when `USE_STATEVECTOR=False` — Qiskit only |
+| `GLOBAL_EVAL_STEP` | Evaluate global loss every N passes |
+| `RUN_TAG` | Optional string prepended to the output folder name |
 
 ### Selecting a circuit
 
-Circuits 1–19 are numbered following Figure 2 of Sim et al. (2019). All circuits use 4
+Circuits 1–19 are numbered following Figure 2 of Sim et al. (2019) [5]. All circuits use 4
 qubits and between 4 and 28 trainable parameters per layer application. Key properties:
 
-- **Circuits 1, 2, 9–12, 15**: Only Rx/Ry/Rz gates — all parameters use the two-term rule,
-  training is fastest.
+- **Circuits 1, 2, 9–12, 15**: Only Rx/Ry/Rz gates — all parameters use the two-term rule.
 - **Circuits 3–8, 13–14, 16–19**: Include CRx/CRy/CRz gates — some parameters use the
-  four-term rule. More expressive but computationally heavier.
+  four-term rule.
 
 ---
 
@@ -347,35 +344,35 @@ new event without requiring the training file.
 
 ## References
 
-1. **Mitarai, K., Negoro, M., Kitagawa, M., & Fujii, K. (2018).**
+**1.** **Mitarai, K., Negoro, M., Kitagawa, M., & Fujii, K. (2018).**
    Quantum circuit learning.
    *Physical Review A*, 98, 032309.
    [arXiv:1803.00745](https://arxiv.org/abs/1803.00745)
    — *Two-term parameter shift rule for exact quantum gradients; used in
    `compute_batch_gradient_and_loss` for Rx/Ry/Rz gates in all four implementations.*
 
-2. **Schuld, M., Bergholm, V., Gogolin, C., Izaac, J., & Killoran, N. (2019).**
+**2.** **Schuld, M., Bergholm, V., Gogolin, C., Izaac, J., & Killoran, N. (2019).**
    Evaluating analytic gradients on quantum hardware.
    *Physical Review A*, 99, 032331.
    [arXiv:1811.11184](https://arxiv.org/abs/1811.11184)
    — *Proof of exactness of the two-term parameter shift rule for gates of the form
    exp(−iθ/2·P) where P is a Pauli operator.*
 
-3. **Anselmetti, G.-L. R., Wierichs, D., Gogolin, C., & Parrish, R. M. (2021).**
+**3.** **Anselmetti, G.-L. R., Wierichs, D., Gogolin, C., & Parrish, R. M. (2021).**
    Local, expressive, quantum-number-preserving VQE ansätze for fermionic systems.
    *New Journal of Physics*, 23, 113010.
    [arXiv:2104.05695](https://arxiv.org/abs/2104.05695)
    — *Four-term parameter shift rule for controlled-Pauli-rotation gates with generator
    eigenvalues {−1, 0, +1} (Appendix F.2, Eq. F15); used for CRx/CRy/CRz gates.*
 
-4. **Kingma, D. P., & Ba, J. (2014).**
+**4.** **Kingma, D. P., & Ba, J. (2014).**
    Adam: A method for stochastic optimization.
    [arXiv:1412.6980](https://arxiv.org/abs/1412.6980)
    — *Standard Adam optimiser (constant-β₁/β₂ formulation); the specific
    implementation used is `sklearn.neural_network._stochastic_optimizers.AdamOptimizer`
    in all four training files.*
 
-5. **Sim, S., Johnson, P. D., & Aspuru-Guzik, A. (2019).**
+**5.** **Sim, S., Johnson, P. D., & Aspuru-Guzik, A. (2019).**
    Expressibility and entangling capability of parameterized quantum circuits
    for hybrid quantum-classical algorithms.
    *Advanced Quantum Technologies*, 2(12), 1900070.
@@ -383,14 +380,14 @@ new event without requiring the training file.
    — *Circuit templates 1–19 in `circuits_library_Qiskit.py` and
    `circuits_library_PyQuil.py` follow Figure 2 of this work.*
 
-6. **Qiskit contributors (2023).**
+**6.** **Qiskit contributors (2023).**
    Qiskit: An open-source framework for quantum computing.
    [DOI: 10.5281/zenodo.2573505](https://doi.org/10.5281/zenodo.2573505) (accessed 2026)
    — *Quantum computing framework used by the primary Qiskit implementation
    (`qiskit`, `qiskit-aer`). The Zenodo record reflects the last archived version (2023);
    the framework was used in its current 2026 release.*
 
-7. **Sivarajah, S., Dilkes, S., Cowtan, A., Sherwood, W., Misra, A., & Duncan, R. (2021).**
+**7.** **Sivarajah, S., Dilkes, S., Cowtan, A., Sherwood, W., Misra, A., & Duncan, R. (2021).**
    t|ket⟩: a retargetable compiler for NISQ devices.
    *Quantum Science and Technology*, 6(1), 014003.
    [DOI: 10.1088/2058-9565/ab8e92](https://doi.org/10.1088/2058-9565/ab8e92)
@@ -398,7 +395,7 @@ new event without requiring the training file.
    (Qiskit → Pytket → PyQuil), rebasing the amplitude embedding to native
    Rigetti gates {Rx, Rz, CZ}.*
 
-8. **Smith, R. S., Curtis, M. J., & Zeng, W. J. (2017).**
+**8.** **Smith, R. S., Curtis, M. J., & Zeng, W. J. (2017).**
    A practical quantum instruction set architecture.
    [arXiv:1608.03355](https://arxiv.org/abs/1608.03355)
    — *Describes the Quil quantum instruction language, the basis of the PyQuil

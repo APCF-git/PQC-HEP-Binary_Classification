@@ -9,8 +9,7 @@ Affiliation: Student at Instituto Superior Técnico, Universidade de Lisboa
 Description:
     Defines 19 parameterized ansatz circuits for use as W(theta) in the PQC pipeline.
     All circuits are implemented natively in Qiskit — no PyQuil dependency.
-
-
+    Circuit templates follow Figure 2 of Sim et al. (2019) — see references in README.md.
 
 Each circuit function has the following signature:
     circuit_N(qc, theta, n_layers) -> QuantumCircuit

@@ -6,17 +6,7 @@ Email: apcf@topfonseca.com
 Institutional email: adriano.fonseca@tecnico.ulisboa.pt
 Affiliation: Student at Instituto Superior Técnico, Universidade de Lisboa
 
-Description:
-    Parametrized Quantum Circuit (PQC) training pipeline for binary
-    classification of high-energy physics events (signal vs. background).
-    Fully implemented in Qiskit — no PyQuil or pytket dependency.
-
-    Circuit templates and numbering follow Figure 2 (page 7) of:
-        Sim, S., Johnson, P. D., & Aspuru-Guzik, A. (2019).
-        Expressibility and Entangling Capability of Parameterized Quantum
-        Circuits for Hybrid Quantum-Classical Algorithms.
-        Advanced Quantum Technologies, 2(12), 1900070.
-        https://doi.org/10.1002/qute.201900070
+Circuit templates and numbering follow Figure 2 of Sim et al. (2019) — see references in README.md.
 
 Usage:
     python PQC_HEP_training_file_Qiskit.py
@@ -48,7 +38,7 @@ Training pipeline (mini-batch mode):
 
     Per batch:
       1. Run all BATCH_SIZE circuits at the current theta -> P(|1>) per event.
-      2. Compute the batch loss (NN.pdf eq. 3, sum is over batch events only).
+      2. Compute the batch loss (weighted binary cross-entropy, sum is over batch events only).
       3. Compute the batch gradient via the parameter shift rule, accumulating
          contributions from all batch events.
       4. Take one Adam step (sklearn AdamOptimizer) -> update theta.
@@ -57,10 +47,7 @@ Training pipeline (mini-batch mode):
       - BATCH_EVAL_CHECKPOINTS : store the pre-step loss of the last batch.
       - GLOBAL_EVAL_CHECKPOINTS: run ALL events with current theta, store loss.
 
-    Adam optimizer: sklearn AdamOptimizer, standard Kingma & Ba 2014 formulation
-    with constant beta_1/beta_2 EMA coefficients. This is NOT the time-varying
-    e^{-beta*t} formulation from the supervisor's NN.pdf. Confirm with your
-    supervisor which formulation is intended before finalising hyperparameters.
+    Adam optimizer: sklearn AdamOptimizer, standard constant-beta EMA formulation.
 
 Gradient assumption:
     The parameter shift rule gives the mathematically exact gradient ONLY for specific
@@ -69,12 +56,10 @@ Gradient assumption:
       two_term  : gates of the form exp(-iθ/2·P), P a Pauli, eigenvalues {+1,-1}.
                   Exact gradient: [f(θ+π/2) − f(θ−π/2)] / 2.
                   Satisfied by: Rx(θ), Ry(θ), Rz(θ).
-                  (Mitarai et al. 2018, arXiv:1803.00745)
       four_term : controlled-Pauli-rotation gates, generator eigenvalues {-1,0,+1}.
                   Exact gradient: d1·[f(θ+π/2)−f(θ−π/2)] − d2·[f(θ+π)−f(θ−π)]
                   where d1=1/2, d2=(√2−1)/4.
                   Satisfied by: CRx(θ), CRy(θ), CRz(θ).
-                  (Anselmetti et al. 2021, arXiv:2104.05695, Appendix F.2, Eq. F15)
     If a parameter feeds a gate with no known rule, a ValueError is raised before
     training begins — there is no silent failure.
 
@@ -127,13 +112,13 @@ N_DIM    = 2**N_QUBITS    # Hilbert-space dimension = 16
 # Circuits and data.
 # Selects the variational form circuit and specifies where to find the data files.
 CIRCUITS_FILE   = "circuits_library_Qiskit.py"  # path to the circuits library Python file
-CIRCUIT_NUMBER  = 2                              # circuit template to use (integer 1-19)
+CIRCUIT_NUMBER  = 1                              # circuit template to use (integer 1-19)
 N_LAYERS        = 1                              # number of variational block repetitions (>= 1)
 DATA_FOLDER     = "../Data"                      # folder containing the CSV files; None = current directory
 SIG_FILE        = "train_sig.csv"               # signal CSV filename (relative to DATA_FOLDER)
 BKG_FILE        = "train_bkg.csv"              # background CSV filename (relative to DATA_FOLDER)
-MAX_EVENTS      = 2000                          # total events to use; None = use all events
-BALANCE_CLASSES = True                          # if True, use equal S and B counts; requires MAX_EVENTS != None
+MAX_EVENTS      = None                          # total events to use; None = use all events
+BALANCE_CLASSES = False                          # if True, use equal S and B counts; requires MAX_EVENTS != None
 
 # Event ordering.
 # Controls the order and randomisation of training events.
@@ -141,7 +126,7 @@ BALANCE_CLASSES = True                          # if True, use equal S and B cou
 # "signal_first"     : all signal events first, then all background
 # "background_first" : all background events first, then all signal
 EVENT_ORDER       = "random"
-DATA_SHUFFLE_SEED = 21     # seed for the initial event shuffle; None = random
+DATA_SHUFFLE_SEED = None     # seed for the initial event shuffle; None = random
 
 # Between-pass reshuffling.
 # If True, the event order is re-randomised at the start of each pass after pass 1.
@@ -155,7 +140,7 @@ PASS_RESHUFFLE_SEED      = None   # base seed for between-pass reshuffles; None 
 # Training hyperparameters.
 # Controls the training loop structure (epochs, batch size) and the Adam
 # optimiser step (learning rate and moment decay coefficients).
-N_ITER = 100   # number of full passes over all training events (epochs)
+N_ITER = 10    # number of full passes over all training events (epochs)
 
 # Batch size.
 # BATCH_SIZE_IS_FRACTION controls how BATCH_SIZE is interpreted:
@@ -164,18 +149,16 @@ N_ITER = 100   # number of full passes over all training events (epochs)
 #   True  : BATCH_SIZE is a fraction of the total events used, in (0, 1].
 #           BATCH_SIZE = 1.0 means the entire dataset in one batch (full batch GD).
 #           The resolved event count must evenly divide the total number of events.
-BATCH_SIZE_IS_FRACTION = False   # False = exact count, True = fraction of total events
-BATCH_SIZE             = 100     # exact events per batch (int >= 1) or fraction (float in (0, 1])
+BATCH_SIZE_IS_FRACTION = True   # False = exact count, True = fraction of total events
+BATCH_SIZE             = 0.1   # exact events per batch (int >= 1) or fraction (float in (0, 1])
 
-# Adam optimizer — sklearn AdamOptimizer, Kingma & Ba 2014 standard formulation.
+# Adam optimizer — sklearn AdamOptimizer, standard constant-beta EMA formulation.
 # Uses constant beta_1/beta_2 as EMA decay coefficients.
-# NOTE: this is NOT the time-varying e^{-beta*t} formulation from the supervisor's
-# NN.pdf. Confirm with your supervisor which formulation is intended.
-ALPHA   = 1e-2    # learning rate
+ALPHA   = 5e-3    # learning rate
 BETA1   = 0.9     # first-moment EMA decay coefficient (standard default)
 BETA2   = 0.999   # second-moment EMA decay coefficient (standard default)
 EPSILON = 1e-8    # numerical stability constant
-THETA_INIT_SEED = 42     # seed for the initial theta values; None = random
+THETA_INIT_SEED = None      # seed for the initial theta values; None = random
 
 # Evaluation checkpoints.
 # Specifies when to pause training and record the loss (during and after).
@@ -209,17 +192,17 @@ BATCH_EVAL_CHECKPOINTS  = ["start", "end"]
 # The fill uses the step starting from the list's minimum upward; the first
 # value that would exceed the list's maximum is not added.
 # Set to None to disable automatic filling.
-GLOBAL_EVAL_STEP = 5   # integer >= 1, or None to disable
-BATCH_EVAL_STEP  = 5   # integer >= 1, or None to disable
+GLOBAL_EVAL_STEP = None   # integer >= 1, or None to disable
+BATCH_EVAL_STEP  = None   # integer >= 1, or None to disable
 
 # Simulation mode.
 # Selects between exact statevector computation (no shot noise, deterministic)
 # and shot-based measurement simulation (realistic for real quantum hardware).
 # True  : exact P(|1>) from statevector — no shot noise, deterministic, fast.
 # False : estimate P(|1>) from Nm measurement shots — realistic for real hardware.
-USE_STATEVECTOR   = True
+USE_STATEVECTOR   = False
 Nm                = 1000     # shots per circuit evaluation (ignored when USE_STATEVECTOR=True)
-SIM_SEED          = 21       # AerSimulator RNG seed (int >= 0) or None for a random seed
+SIM_SEED          = None       # AerSimulator RNG seed (int >= 0) or None for a random seed
 # Local simulation method (only used when IBM_BACKEND=None and USE_STATEVECTOR=False).
 # "automatic"            : auto-select based on circuit (recommended; original behaviour).
 # "statevector"          : exact internal state, then samples Nm shots (has shot noise).
@@ -247,7 +230,7 @@ SHOW_ELAPSED_TIME = True
 # None  : folder name is auto-generated as:
 #         circuit{N}_layers{L}_{iter}iter_batch{batch}_{timestamp}
 # string: folder name becomes {RUN_TAG}_circuit{N}_layers{L}_{iter}iter_batch{batch}_{timestamp}
-RUN_TAG = "test_main"
+RUN_TAG = None
 
 # =============================================================================
 # END OF USER SETTINGS
@@ -664,7 +647,7 @@ print(f"  Batches per N_iter : {N_BATCHES_PER_ITER}  (batch_size={batch_size})\n
 # =============================================================================
 # Defines all quantum operations: amplitude embedding, transpiled circuit
 # building, shot-based or statevector measurement, loss, and gradient via the
-# parameter shift rule (Mitarai et al. 2018; arXiv:1803.00745).
+# parameter shift rule.
 
 # --- Backend -----------------------------------------------------------------
 # Select either the local AerSimulator or a real IBM Quantum computer.
@@ -781,14 +764,14 @@ def _run_circuits_batch(batch_circuits, theta):
 
 def compute_loss(p_values, event_labels, event_weights):
     """
-    Weighted binary cross-entropy over a set of events (NN.pdf eq. 3):
+    Weighted binary cross-entropy over a set of events:
       L_K = (1/N) * sum_i { w_i * [-z_i*ln(y_i) - (1-z_i)*ln(1-y_i)] }
     N is the number of events passed in (batch size or full dataset size).
     Uses sklearn log_loss for the weighted sum, then divides by N.
     """
     N      = len(p_values)
     p_clip = np.clip(p_values, 1e-7, 1 - 1e-7)
-    raw    = log_loss(event_labels, p_clip, normalize=False, sample_weight=event_weights)
+    raw    = log_loss(event_labels, p_clip, normalize=False, sample_weight=event_weights, labels=[0, 1])
     return float(raw / N)
 
 
@@ -842,10 +825,9 @@ def compute_batch_gradient_and_loss(batch_circuits, batch_labels, batch_weights,
            dL_j/dp_j = w_j * (-z_j / p_j  +  (1-z_j) / (1-p_j))
       3. Per theta component k the correct exact shift rule is applied:
            two_term  : grad[k] = (1/N) * dot(dL_dp, (p+ - p-) / 2)
-                       p± evaluated at theta ± π/2  (Mitarai et al. 2018).
+                       p± evaluated at theta ± π/2.
            four_term : grad[k] = (1/N) * dot(dL_dp, d1*(fa+−fa−) − d2*(fb+−fb−))
-                       a-shifts ±π/2, b-shifts ±π, d1=1/2, d2=(√2−1)/4
-                       (Anselmetti et al. 2021, arXiv:2104.05695, Appendix F.2 Eq. F15).
+                       a-shifts ±π/2, b-shifts ±π, d1=1/2, d2=(√2−1)/4.
       Total circuit evaluations: (1 + 2*n_two + 4*n_four) * batch_size.
 
     Returns (gradient_array, batch_loss_scalar).
@@ -970,7 +952,6 @@ theta_current = rng_theta.uniform(-np.pi, np.pi, N_PARAMS)
 
 # Initialise sklearn AdamOptimizer.
 # params is a list containing theta_current; update_params() modifies it in place.
-# Adam: sklearn AdamOptimizer, Kingma & Ba 2014 (constant-beta EMA).
 optimizer = AdamOptimizer(
     params             = [theta_current],
     learning_rate_init = ALPHA,
@@ -1062,7 +1043,7 @@ for current_iter in range(1, n_iter + 1):
             )
 
             # One Adam step: sklearn AdamOptimizer updates theta_current in place.
-            # Adam: sklearn AdamOptimizer, Kingma & Ba 2014 (constant-beta EMA).
+            # Adam step.
             optimizer.update_params([theta_current], [grad])
 
             # Track the last batch loss of this pass for BATCH_EVAL_CHECKPOINTS.
