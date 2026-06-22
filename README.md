@@ -129,7 +129,7 @@ Training uses **mini-batch gradient descent** with one Adam optimiser step per b
 
 $$L_K = -\frac{1}{N} \sum_{i=1}^{N} w_i \left[ z_i \ln y_i + (1 - z_i) \ln(1 - y_i) \right]$$
 
-3. Gradient: computed exactly via the **parameter shift rule**:
+3. Gradient: computed exactly via the **parameter shift rule**, where $f(\boldsymbol{\theta}) \equiv y_i(\boldsymbol{\theta}) = P_0(|1\rangle)$ is the circuit output for event $i$ at parameters $\boldsymbol{\theta}$ (the quantity evaluated in step 1):
    - **Two-term rule** for Rx(θ), Ry(θ), Rz(θ) (generator eigenvalues {+1, −1}) (see [[1]](#ref-1), [[2]](#ref-2)):
 
 $$\frac{\partial f}{\partial \theta_k} = \frac{f(\theta + \tfrac{\pi}{2} e_k) - f(\theta - \tfrac{\pi}{2} e_k)}{2}$$
@@ -138,7 +138,13 @@ $$\frac{\partial f}{\partial \theta_k} = \frac{f(\theta + \tfrac{\pi}{2} e_k) - 
 
 $$\frac{\partial f}{\partial \theta_k} = d_1 \left[ f(\theta + \tfrac{\pi}{2} e_k) - f(\theta - \tfrac{\pi}{2} e_k) \right] - d_2 \left[ f(\theta + \pi e_k) - f(\theta - \pi e_k) \right]$$
 
-where $d_1 = \tfrac{1}{2}$, $d_2 = \tfrac{\sqrt{2}-1}{4}$ (Anselmetti et al. 2021, Appendix F.2, Eq. F15).
+where $d_1 = \tfrac{1}{2}$, $d_2 = \tfrac{\sqrt{2}-1}{4}$ (Anselmetti et al. 2021, Appendix F.2, Eq. F15). These rules give the mathematically exact gradient $\partial y_i/\partial\theta_k$ with no finite-difference approximation.
+
+   The batch gradient of the loss then follows from the **chain rule**:
+
+$$\frac{\partial L_K}{\partial \theta_k} = \frac{1}{N} \sum_{i \in K} w_i \left( -\frac{z_i}{y_i} + \frac{1-z_i}{1-y_i} \right) \frac{\partial y_i}{\partial \theta_k}$$
+
+   where $\partial y_i/\partial\theta_k$ is the shift-rule result above.
 
 4. Optimiser update: **Adam** [[4]](#ref-4) (Kingma & Ba 2014, standard constant-β₁/β₂ formulation,
    implemented via `sklearn.neural_network._stochastic_optimizers.AdamOptimizer`).
