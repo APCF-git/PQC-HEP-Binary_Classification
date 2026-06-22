@@ -125,9 +125,11 @@ The classifier output is the measurement probability P(qubit 0 = |1⟩).
 Training uses **mini-batch gradient descent** with one Adam optimiser step per batch:
 
 1. Forward pass: evaluate P(|1⟩) for all events in the batch at the current θ.
-2. Batch loss: weighted binary cross-entropy averaged over the batch:
+2. Batch loss: weighted binary cross-entropy over the current batch $K$:
 
-$$L_K = -\frac{1}{N} \sum_{i=1}^{N} w_i \left[ z_i \ln y_i + (1 - z_i) \ln(1 - y_i) \right]$$
+$$L_K = -\frac{1}{N_K} \sum_{i \in K} w_i \left[ z_i \ln y_i + (1 - z_i) \ln(1 - y_i) \right]$$
+
+where $K$ is the current batch, $N_K = B$ is the batch size, $z_i \in \{0,1\}$ is the true label (1 for signal, 0 for background), and $w_i$ are the normalised event weights (see [Weight normalisation](#weight-normalisation) below).
 
 3. Gradient: computed exactly via the **parameter shift rule**, where $f(\boldsymbol{\theta}) \equiv y_i(\boldsymbol{\theta}) = P_0(|1\rangle)$ is the circuit output for event $i$ at parameters $\boldsymbol{\theta}$ (the quantity evaluated in step 1):
    - **Two-term rule** for Rx(θ), Ry(θ), Rz(θ) (generator eigenvalues {+1, −1}) (see [[1]](#ref-1), [[2]](#ref-2)):
@@ -142,7 +144,7 @@ where $d_1 = \tfrac{1}{2}$, $d_2 = \tfrac{\sqrt{2}-1}{4}$ (Anselmetti et al. 202
 
    The batch gradient of the loss then follows from the **chain rule**:
 
-$$\frac{\partial L_K}{\partial \theta_k} = \frac{1}{N} \sum_{i \in K} w_i \left( -\frac{z_i}{y_i} + \frac{1-z_i}{1-y_i} \right) \frac{\partial y_i}{\partial \theta_k}$$
+$$\frac{\partial L_K}{\partial \theta_k} = \frac{1}{N_K} \sum_{i \in K} w_i \left( -\frac{z_i}{y_i} + \frac{1-z_i}{1-y_i} \right) \frac{\partial y_i}{\partial \theta_k}$$
 
    where $\partial y_i/\partial\theta_k$ is the shift-rule result above.
 
