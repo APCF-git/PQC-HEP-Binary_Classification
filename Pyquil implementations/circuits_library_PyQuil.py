@@ -291,7 +291,7 @@ def circuit_7(p, theta, n_layers):
 
             p += RZ(theta[current_parameter], i)
             current_parameter += 1
-        
+
         p += RZ(theta[current_parameter], 1).controlled(2)
         current_parameter += 1
 
@@ -338,7 +338,7 @@ def circuit_8(p, theta, n_layers):
 
             p += RZ(theta[current_parameter], i)
             current_parameter += 1
-        
+
         p += RX(theta[current_parameter], 1).controlled(2)
         current_parameter += 1
 
@@ -406,7 +406,7 @@ def circuit_10(p, theta, n_layers):
         for i in range(4):
             p += RY(theta[current_parameter], i)
             current_parameter += 1
-            
+
     return p
 
 
@@ -447,7 +447,7 @@ def circuit_11(p, theta, n_layers):
             current_parameter += 1
 
         p += CNOT(2, 1)
-            
+
     return p
 
 
@@ -489,7 +489,7 @@ def circuit_12(p, theta, n_layers):
             current_parameter += 1
 
         p += CZ(2, 1)
-            
+
     return p
 
 
@@ -529,7 +529,7 @@ def circuit_13(p, theta, n_layers):
         for i in range(4):
             p += RY(theta[current_parameter], i)
             current_parameter += 1
-        
+
         p += RZ(theta[current_parameter], 2).controlled(3)
         current_parameter += 1
 
@@ -539,7 +539,7 @@ def circuit_13(p, theta, n_layers):
         for i in range(2):
             p += RZ(theta[current_parameter], i).controlled(i+1)
             current_parameter += 1
-     
+
     return p
 
 
@@ -580,7 +580,7 @@ def circuit_14(p, theta, n_layers):
         for i in range(4):
             p += RY(theta[current_parameter], i)
             current_parameter += 1
-        
+
         p += RX(theta[current_parameter], 2).controlled(3)
         current_parameter += 1
 
@@ -590,7 +590,7 @@ def circuit_14(p, theta, n_layers):
         for i in range(2):
             p += RX(theta[current_parameter], i).controlled(i+1)
             current_parameter += 1
-     
+
     return p
 
 
@@ -626,14 +626,14 @@ def circuit_15(p, theta, n_layers):
         for i in range(4):
             p += RY(theta[current_parameter], i)
             current_parameter += 1
-        
+
         p += CNOT(3, 2)
 
         p += CNOT(0, 3)
 
         for i in range(2):
             p += CNOT(i+1, i)
-     
+
     return p
 
 
@@ -668,7 +668,7 @@ def circuit_16(p, theta, n_layers):
 
         p += RZ(theta[current_parameter], 2).controlled(3)
         current_parameter += 1
-        
+
         p += RZ(theta[current_parameter], 1).controlled(2)
         current_parameter += 1
 
@@ -707,7 +707,7 @@ def circuit_17(p, theta, n_layers):
 
         p += RX(theta[current_parameter], 2).controlled(3)
         current_parameter += 1
-        
+
         p += RX(theta[current_parameter], 1).controlled(2)
         current_parameter += 1
 

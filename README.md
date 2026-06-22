@@ -144,7 +144,7 @@ where $d_1 = \tfrac{1}{2}$, $d_2 = \tfrac{\sqrt{2}-1}{4}$ (Anselmetti et al. 202
 
    The batch gradient of the loss then follows from the **chain rule**:
 
-$$\frac{\partial L_K}{\partial \theta_k} = \frac{1}{N_K} \sum_{i \in K} w_i \left( -\frac{z_i}{y_i} + \frac{1-z_i}{1-y_i} \right) \frac{\partial y_i}{\partial \theta_k}$$
+$$\frac{\partial L_K}{\partial \theta_k} = -\frac{1}{N_K} \sum_{i \in K} w_i \frac{z_i - y_i}{y_i(1-y_i)}\,\frac{\partial y_i}{\partial \theta_k}$$
 
    where $\partial y_i/\partial\theta_k$ is the shift-rule result above.
 
