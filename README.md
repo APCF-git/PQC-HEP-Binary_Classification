@@ -302,6 +302,23 @@ python3 PQC_HEP_training_file_pytket.py
 
 ---
 
+## Troubleshooting
+
+### PyQuil implementations: QVM connection error
+
+If training fails with a connection error, the QVM or Quilc container is not running.
+Check with `docker ps` and restart if needed using the commands in the Installation section.
+If ports 5001 or 5555 are already in use on your system, change the `-p` mapping in the
+`docker run` command **and** update `QVM_PORT` / `QUILC_PORT` in USER SETTINGS to match.
+
+### Qiskit: IBM hardware
+
+If `IBM_BACKEND` is set, `qiskit-ibm-runtime` must be installed and a valid `IBM_TOKEN`
+must be provided. Setting `IBM_BACKEND = None` always uses local simulation with no account
+required.
+
+---
+
 ## Key USER SETTINGS
 
 The following settings have the most significant impact on training. All settings are
