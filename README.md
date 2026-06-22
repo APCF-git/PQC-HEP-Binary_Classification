@@ -337,8 +337,16 @@ Each run creates a timestamped output folder:
 The `results.json` file records all USER SETTINGS, the loss at each checkpoint, and
 `theta_final` (the trained parameter vector). It can be loaded with Python's `json.load()`.
 
-The `classifier.py` file is a self-contained script that applies the trained circuit to a
-new event without requiring the training file.
+The `classifier.py` file is a self-contained script that applies the trained circuit to new
+events without requiring the training file. It supports two modes:
+
+- **Single event** (default): edit `your_event_features` inside the file and run it directly.
+- **Batch CSV**: pass a data file as a command-line argument to classify every event in it:
+  ```bash
+  python classifier.py path/to/events.csv
+  ```
+  The CSV must have the same column format as the training data (col 0–11: features; col 12+: ignored).
+  One result line is printed per event.
 
 ---
 
