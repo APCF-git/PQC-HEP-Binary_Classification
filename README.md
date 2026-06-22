@@ -3,7 +3,7 @@
 **Author:** Adriano Pinto Claro da Fonseca  
 **Email:** apcf@topfonseca.com  
 **Institutional email:** adriano.fonseca@tecnico.ulisboa.pt  
-**Affiliation:** Instituto Superior Técnico, Universidade de Lisboa  
+**Affiliation:** Student at Instituto Superior Técnico, Universidade de Lisboa  
 **Supervisor:** Pedrame Bargassa, Ruđer Bošković Institute (RBI)
 
 ---
