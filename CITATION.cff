@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "PQC-HEP-Binary_Classification"
+abstract: >
+  Parametrized quantum circuit (PQC) binary classifier for high-energy physics
+  signal/background separation. Four implementations across Qiskit and PyQuil,
+  covering Gram-Schmidt, QR-decomposition, pytket, and native Qiskit amplitude
+  embedding, with exact parameter shift rule gradients and Adam optimisation.
+  All nineteen variational forms from Sim et al. (2019) are implemented across
+  four qubits with amplitude embedding of twelve kinematic features per event.
+authors:
+  - family-names: "Fonseca"
+    given-names: "Adriano"
+    affiliation: "Instituto Superior Técnico, Universidade de Lisboa"
+    email: "apcf@topfonseca.com"
+version: "1.0.0"
+date-released: "2026-06-24"
+url: "https://github.com/APCF-git/PQC-HEP-Binary_Classification"
+repository-code: "https://github.com/APCF-git/PQC-HEP-Binary_Classification"
+license: MIT
+keywords:
+  - quantum computing
+  - quantum machine learning
+  - high-energy physics
+  - parametrized quantum circuits
+  - amplitude embedding
+  - parameter shift rule
+  - binary classification
+  - variational quantum circuits
+  - qiskit
+  - pyquil
