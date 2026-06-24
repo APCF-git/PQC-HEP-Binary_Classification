@@ -712,25 +712,6 @@ def build_event_circuit(amplitudes, theta_params):
     return transpile(full_qc, backend)
 
 
-# --- Circuit measurement -----------------------------------------------------
-
-def run_circuit_and_measure(transpiled_qc, theta_params, theta):
-    """
-    Bind theta to a pre-transpiled circuit and return P(qubit_0 = |1>).
-    USE_STATEVECTOR=True  : exact result via statevector, no shot noise.
-    USE_STATEVECTOR=False : estimate from Nm measurement shots.
-    """
-    bound = transpiled_qc.assign_parameters(
-        {theta_params[i]: float(v) for i, v in enumerate(theta)}
-    )
-    if USE_STATEVECTOR:
-        sv = Statevector.from_instruction(bound)
-        return float(sv.probabilities([0])[1])
-    counts = backend.run(bound, shots=Nm).result().get_counts()
-    total  = sum(counts.values())
-    return float(sum(v for k, v in counts.items() if k[-1] == '1') / total)
-
-
 def _run_circuits_batch(batch_circuits, theta):
     """
     Evaluate all circuits in batch_circuits at the given theta and return

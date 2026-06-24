@@ -120,6 +120,16 @@ Each circuit consists of two parts applied sequentially to a 4-qubit register:
 
 The classifier output is the measurement probability P(qubit 0 = |1⟩).
 
+<details>
+<summary><b>All 19 variational circuit architectures (click to expand)</b></summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="circuits_dark.svg">
+  <img src="circuits_light.svg" alt="All 19 variational circuit architectures">
+</picture>
+
+</details>
+
 ### Training pipeline
 
 Training uses **mini-batch gradient descent** with one Adam optimiser step per batch:
@@ -208,6 +218,7 @@ Python >= 3.9
 pyquil
 scikit-learn
 numpy
+scipy
 tqdm
 Docker  (to run the QVM and Quilc containers)
 ```
@@ -372,6 +383,29 @@ events without requiring the training file. It supports two modes:
   ```
   The CSV must have the same column format as the training data (col 0–11: features; col 12+: ignored).
   One result line is printed per event.
+
+---
+
+## Cite this work
+
+If you use this code, please cite it as:
+
+**APA:**
+Fonseca, A. (2026). *PQC-HEP-Binary_Classification* (Version 1.0.0) [Computer software]. https://github.com/APCF-git/PQC-HEP-Binary_Classification
+
+**BibTeX:**
+```bibtex
+@software{fonseca2026pqchep,
+  author  = {Fonseca, Adriano},
+  title   = {PQC-HEP-Binary\_Classification},
+  year    = {2026},
+  version = {1.0.0},
+  url     = {https://github.com/APCF-git/PQC-HEP-Binary\_Classification},
+  license = {MIT}
+}
+```
+
+You can also use the **"Cite this repository"** button in the GitHub sidebar (generated automatically from `CITATION.cff`).
 
 ---
 
