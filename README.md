@@ -190,7 +190,7 @@ The Qiskit implementation supports two simulation modes controlled by `USE_STATE
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="circuits_ref_dark.svg">
-  <img src="circuits_ref_light.svg" alt="All 19 variational circuit architectures">
+  <img src="circuits_ref_light.svg" alt="All 19 variational circuit architectures" width="100%">
 </picture>
 
 </details>
