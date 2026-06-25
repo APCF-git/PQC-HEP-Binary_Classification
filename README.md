@@ -120,16 +120,6 @@ Each circuit consists of two parts applied sequentially to a 4-qubit register:
 
 The classifier output is the measurement probability P(qubit 0 = |1⟩).
 
-<details>
-<summary><b>All 19 variational circuit architectures (click to expand)</b></summary>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="circuits_dark.svg">
-  <img src="circuits_light.svg" alt="All 19 variational circuit architectures">
-</picture>
-
-</details>
-
 ### Training pipeline
 
 Training uses **mini-batch gradient descent** with one Adam optimiser step per batch:
@@ -190,6 +180,20 @@ The Qiskit implementation supports two simulation modes controlled by `USE_STATE
 - **`USE_STATEVECTOR = False`**: Estimates P(|1⟩) from `Nm` measurement shots.
   Introduces statistical shot noise in each gradient estimate, simulating what would occur
   on real quantum hardware. Set `Nm ≥ 1000` for reasonable gradient estimates.
+
+---
+
+## Circuit reference
+
+<details>
+<summary><b>All 19 variational circuit architectures — click to expand</b></summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="circuits_dark.svg">
+  <img src="circuits_light.svg" alt="All 19 variational circuit architectures">
+</picture>
+
+</details>
 
 ---
 
