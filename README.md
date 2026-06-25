@@ -265,7 +265,9 @@ pytket-pyquil
 
 ### Data files
 
-The training data files must be CSV files with one event per line:
+**The data files are not included in this repository** and must be provided by the user.
+The signal and background CSV paths are set via `SIG_FILE`, `BKG_FILE`, and `DATA_FOLDER`
+in USER SETTINGS. The expected CSV format (one event per line) is fixed:
 
 ```
 col 0–11 : 12 floating-point feature values
@@ -277,19 +279,23 @@ col 13   : process name (string, ignored during training)
 
 ## Installation
 
-Clone the repository and install dependencies:
+Clone the repository and install dependencies. Each implementation requires a
+different set of packages — install only what you need:
 
 ```bash
-# Qiskit implementation
+# --- Qiskit implementation ---
 pip install qiskit qiskit-aer scikit-learn numpy tqdm
 
-# PyQuil implementations (in addition)
-pip install pyquil
+# --- PyQuil implementations (Gram-Schmidt or QR) ---
+pip install pyquil scikit-learn numpy tqdm
+pip install scipy              # QR implementation only; not needed for Gram-Schmidt
 
-# Pytket implementation (in addition)
+# --- Pytket implementation ---
+# Requires both the PyQuil dependencies above AND the Pytket packages below.
+pip install pyquil scikit-learn numpy tqdm
 pip install pytket pytket-qiskit pytket-pyquil
 
-# Optional: real IBM hardware
+# --- Optional: real IBM hardware (Qiskit only) ---
 pip install qiskit-ibm-runtime
 ```
 
