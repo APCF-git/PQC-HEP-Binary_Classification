@@ -189,8 +189,8 @@ The Qiskit implementation supports two simulation modes controlled by `USE_STATE
 <summary><b>All 19 variational circuit architectures (Sim et al. 2019 <a href="#ref-5">[5]</a>) — click to expand</b></summary>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="circuits_dark.svg">
-  <img src="circuits_light.svg" alt="All 19 variational circuit architectures">
+  <source media="(prefers-color-scheme: dark)" srcset="circuits_ref_dark.svg">
+  <img src="circuits_ref_light.svg" alt="All 19 variational circuit architectures">
 </picture>
 
 </details>
