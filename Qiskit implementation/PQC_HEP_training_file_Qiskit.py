@@ -199,7 +199,7 @@ BATCH_EVAL_STEP  = None   # integer >= 1, or None to disable
 # Selects between exact statevector computation (no shot noise, deterministic)
 # and shot-based measurement simulation (realistic for real quantum hardware).
 # True  : exact P(|1>) from statevector — no shot noise, deterministic, fast.
-# False : estimate P(|1>) from Nm measurement shots — realistic for real hardware.
+# False : estimate P(|1>) from Nm measurement shots — realistic for real hardware (default).
 USE_STATEVECTOR   = False
 Nm                = 1000     # shots per circuit evaluation (ignored when USE_STATEVECTOR=True)
 SIM_SEED          = None       # AerSimulator RNG seed (int >= 0) or None for a random seed
@@ -654,7 +654,7 @@ print(f"  Batches per N_iter : {N_BATCHES_PER_ITER}  (batch_size={batch_size})\n
 
 if IBM_BACKEND is not None:
     try:
-        from qiskit_ibm_runtime import QiskitRuntimeService
+        from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as _IBMSampler
     except ImportError:
         print("Error: IBM_BACKEND is set but qiskit_ibm_runtime is not installed.")
         print("  Run: pip install qiskit-ibm-runtime")
@@ -663,9 +663,11 @@ if IBM_BACKEND is not None:
         service = QiskitRuntimeService(token=IBM_TOKEN)
     else:
         service = QiskitRuntimeService()
-    backend = service.backend(IBM_BACKEND)
+    backend      = service.backend(IBM_BACKEND)
+    _ibm_sampler = _IBMSampler(backend=backend)
     print(f"  Using real IBM Quantum hardware: {IBM_BACKEND}")
 else:
+    _ibm_sampler = None
     # max_parallel_experiments=0: use all available CPU cores when a batch of circuits
     # is submitted in a single backend.run() call. Gracefully degrades to sequential
     # execution if only one core is available. No effect in statevector mode.
@@ -706,7 +708,7 @@ def build_event_circuit(amplitudes, theta_params):
     via assign_parameters(), avoiding repeated transpilation overhead.
     """
     emb_qc  = embed_state_in_qiskit(amplitudes)
-    full_qc = variational_form_fn(emb_qc, list(theta_params), n_layers)
+    full_qc, _ = variational_form_fn(emb_qc, list(theta_params), n_layers)
     if not USE_STATEVECTOR:
         full_qc.measure_all()
     return transpile(full_qc, backend)
@@ -717,10 +719,10 @@ def _run_circuits_batch(batch_circuits, theta):
     Evaluate all circuits in batch_circuits at the given theta and return
     an np.array of P(qubit_0 = |1>) values, one per event.
 
-    Shot-based: submits ALL circuits in a single backend.run() call so AerSimulator
-    can parallelise them across CPU cores (max_parallel_experiments=0). This reduces
-    Python-to-Aer overhead from batch_size calls down to 1 call per theta value.
-    Statevector: evaluates each circuit independently (no backend involved, same cost).
+    Statevector : exact P(|1>) — no backend call, no shot noise.
+    IBM hardware: SamplerV2 (qiskit_ibm_runtime modern API), one run() call for the batch.
+    Local Aer   : backend.run() for all circuits in a single call so AerSimulator can
+                  parallelise across CPU cores (max_parallel_experiments=0).
     """
     bound = [
         qc.assign_parameters({params[i]: float(v) for i, v in enumerate(theta)})
@@ -728,9 +730,18 @@ def _run_circuits_batch(batch_circuits, theta):
     ]
     if USE_STATEVECTOR:
         return np.array([
-            float(Statevector.from_instruction(b).probabilities([0])[1])
+            float(Statevector.from_instruction(b).probabilities([0])[1])  # [0]=qubit index; [1]=P(qubit 0=|1>)
             for b in bound
         ])
+    # Qiskit little-endian: bitstring is q_{n-1}...q_1 q_0, so k[-1] is qubit 0.
+    if IBM_BACKEND is not None:
+        result = _ibm_sampler.run(bound, shots=Nm).result()
+        values = []
+        for i in range(len(bound)):
+            counts = result[i].data.meas.get_counts()
+            total  = sum(counts.values())
+            values.append(float(sum(v for k, v in counts.items() if k[-1] == '1') / total))
+        return np.array(values)
     job    = backend.run(bound, shots=Nm)
     result = job.result()
     values = []
@@ -758,38 +769,27 @@ def compute_loss(p_values, event_labels, event_weights):
 
 # --- Shift rule classification ------------------------------------------------
 
-def classify_shift_rules(qc_template, theta_params):
+def gate_names_to_shift_rules(parameterized_gate_names):
     """
-    Inspect a transpiled parameterised circuit and classify each theta parameter
-    by which shift rule its gate requires. Called once before training.
-    Returns a list of length N_PARAMS: 'two_term' or 'four_term'.
-    Raises ValueError for any parameter feeding an unrecognised gate type,
-    so there is no silent failure or incorrect gradient.
-
-    two_term  : gates exp(-iθ/2·P), P a Pauli, eigenvalues {+1,-1}.
-                Shift π/2 gives the exact gradient.
-    four_term : controlled-Pauli-rotation gates, generator eigenvalues {-1,0,+1}.
-                Four-term rule (shifts π/2 and π) gives the exact gradient.
+    Map gate names returned by the circuit function to parameter shift rules.
+    Gate names 'rx', 'ry', 'rz' map to 'two_term'; 'crx', 'cry', 'crz' to 'four_term'.
+    Raises ValueError for any gate with no known rule — no silent failure.
     """
     TWO_TERM_GATES  = {'rx', 'ry', 'rz'}
     FOUR_TERM_GATES = {'crx', 'cry', 'crz'}
-
-    param_to_rule = {}
-    for instr in qc_template.data:
-        gate_name = instr.operation.name
-        for p in instr.operation.params:
-            for param in getattr(p, 'parameters', []):
-                if gate_name in TWO_TERM_GATES:
-                    param_to_rule[param] = 'two_term'
-                elif gate_name in FOUR_TERM_GATES:
-                    param_to_rule[param] = 'four_term'
-                else:
-                    raise ValueError(
-                        f"Parameter '{param.name}' feeds gate '{gate_name}', which has "
-                        f"no known parameter-shift rule. Add its rule to "
-                        f"classify_shift_rules before using it."
-                    )
-    return [param_to_rule[theta_params[i]] for i in range(len(theta_params))]
+    rules = []
+    for name in parameterized_gate_names:
+        if name in TWO_TERM_GATES:
+            rules.append('two_term')
+        elif name in FOUR_TERM_GATES:
+            rules.append('four_term')
+        else:
+            raise ValueError(
+                f"Gate '{name}' has no known parameter-shift rule. "
+                f"Add its rule to gate_names_to_shift_rules before using it, "
+                f"and add its gradient formula to compute_batch_gradient_and_loss."
+            )
+    return rules
 
 
 # --- Batch gradient via parameter shift rule ---------------------------------
@@ -836,7 +836,7 @@ def compute_batch_gradient_and_loss(batch_circuits, batch_labels, batch_weights,
             p_plus   = _run_circuits_batch(batch_circuits, tp)
             p_minus  = _run_circuits_batch(batch_circuits, tm)
             dpdtheta = (p_plus - p_minus) / 2.0
-        else:  # four_term
+        elif shift_rules[k] == 'four_term':
             ta_p = theta.copy(); ta_p[k] += np.pi / 2
             ta_m = theta.copy(); ta_m[k] -= np.pi / 2
             tb_p = theta.copy(); tb_p[k] += np.pi
@@ -846,6 +846,11 @@ def compute_batch_gradient_and_loss(batch_circuits, batch_labels, batch_weights,
             f_bp = _run_circuits_batch(batch_circuits, tb_p)
             f_bm = _run_circuits_batch(batch_circuits, tb_m)
             dpdtheta = D1 * (f_ap - f_am) - D2 * (f_bp - f_bm)
+        else:
+            raise ValueError(
+                f"Unknown shift rule '{shift_rules[k]}' for parameter {k}. "
+                f"Add its gradient formula to compute_batch_gradient_and_loss."
+            )
 
         gradients[k] = float(np.dot(dL_dp, dpdtheta) / N)
 
@@ -920,8 +925,9 @@ for x_raw in tqdm(events, desc="Building", unit="event", leave=True):
 print()
 
 # Classify each theta parameter by the shift rule its gate requires.
-# Uses the first circuit as template — all circuits share the same variational form.
-shift_rules = classify_shift_rules(all_circuits[0][0], all_circuits[0][1])
+_dummy_qc = QuantumCircuit(N_QUBITS)
+_, parameterized_gate_names = variational_form_fn(_dummy_qc, [0.0] * N_PARAMS, n_layers)
+shift_rules = gate_names_to_shift_rules(parameterized_gate_names)
 _n_two  = shift_rules.count('two_term')
 _n_four = shift_rules.count('four_term')
 print(f"  Shift rule classification: {_n_two} two-term (Rx/Ry/Rz), "
@@ -1024,7 +1030,6 @@ for current_iter in range(1, n_iter + 1):
             )
 
             # One Adam step: sklearn AdamOptimizer updates theta_current in place.
-            # Adam step.
             optimizer.update_params([theta_current], [grad])
 
             # Track the last batch loss of this pass for BATCH_EVAL_CHECKPOINTS.
@@ -1275,7 +1280,7 @@ classifier_script = textwrap.dedent(f"""\
                 print_result(classify([float(x) for x in row[:N_FEAT]]), index=i)
     else:
         # Mode 1: classify a single event — replace your_event_features with real values.
-        your_event_features = [0.0] * N_FEAT   # <-- replace with your 12 feature values
+        your_event_features = [1.0] * N_FEAT   # <-- replace with your 12 feature values
         print_result(classify(your_event_features))
 """)
 

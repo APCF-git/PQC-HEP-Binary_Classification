@@ -33,6 +33,10 @@ Four implementations are provided across two quantum computing frameworks:
 PQC_HEP_Code/
 │
 ├── README.md                                    ← this file
+├── CITATION.cff                                 ← citation metadata
+├── LICENSE                                      ← MIT licence
+├── circuits_light.svg                           ← visualisation of all 19 circuits (light background)
+├── circuits_dark.svg                            ← visualisation of all 19 circuits (dark background)
 │
 ├── Qiskit implementation/
 │   ├── PQC_HEP_training_file_Qiskit.py          ← primary training script
@@ -95,10 +99,9 @@ The three PyQuil implementations are included for the following reasons:
    Rigetti quantum hardware by changing the `QUANTUM_COMPUTER` setting to a QPU name (e.g.
    `"Ankaa-2"`), since the native-gate rebase makes the circuit hardware-compatible.
 
-4. **Completeness and future development**: All four implementations share the same
-   mathematical framework (identical loss function, weight normalisation, parameter shift
-   rule, and Adam optimiser). They are included for completeness and may serve as a starting
-   point for future comparisons across quantum hardware providers.
+4. **Completeness**: All four implementations share the same mathematical framework
+   (identical loss function, weight normalisation, parameter shift rule, and Adam optimiser),
+   providing a basis for cross-provider hardware comparisons.
 
 > **Note:** The Gram-Schmidt and QR implementations use a custom `DefGate` to apply the
 > 16×16 embedding unitary. This construct is only supported by the PyQuil QVM simulator
@@ -166,8 +169,34 @@ training data, regardless of the `MAX_EVENTS` or `BALANCE_CLASSES` settings.
 ### Gate classification
 
 Before training begins, each parameter θₖ is automatically classified by the gate type it
-feeds, and the correct gradient rule is applied per parameter. An unrecognised gate type
-raises a `ValueError` immediately. There is no silent failure.
+feeds, and the correct gradient rule is applied per parameter. Each circuit function directly
+reports the gate name for every parameter it consumes via a `parameterized_gate_names` list,
+so classification is backend-independent: all 19 circuits produce exact gradients on both
+local simulation and real IBM or Rigetti quantum hardware.
+
+Supported parameterised gate types and their rules:
+
+| Gate | Rule | Generator eigenvalues |
+|---|---|---|
+| Rx(θ), Ry(θ), Rz(θ) | Two-term | {+1, −1} |
+| CRx(θ), CRy(θ), CRz(θ) | Four-term | {−1, 0, +1} |
+
+An unrecognised gate type raises a `ValueError` immediately with a clear message — there is
+no silent failure.
+
+> **If you add a new circuit:** two rules apply.
+>
+> 1. **Scaled parameters:** each trainable parameter must appear **directly** as a gate angle,
+>    not as a scaled expression. Writing `rx(theta[k], q)` is correct; writing `rx(2*theta[k], q)`
+>    causes the shift size to be wrong and gives silently incorrect gradients without triggering
+>    any error. All 19 existing circuits follow this convention.
+>
+> 2. **New gate types:** if your circuit uses a parameterised gate not in the table above, you
+>    must add it in two places: (a) add its name and a rule label to `gate_names_to_shift_rules` in
+>    each training file you use, and (b) if its generator eigenvalue structure does not match any
+>    existing rule, also add the corresponding gradient formula in `compute_batch_gradient_and_loss`
+>    in each training file. If the new gate fits an existing rule (e.g. another single-qubit
+>    rotation), only step (a) is needed.
 
 ### Simulation modes (Qiskit only)
 
@@ -222,15 +251,16 @@ Python >= 3.9
 pyquil
 scikit-learn
 numpy
-scipy
+scipy          (QR implementation only)
 tqdm
-Docker  (to run the QVM and Quilc containers)
+Docker         (to run the QVM and Quilc containers)
 ```
 
-Additional dependency for the Pytket implementation:
+Additional dependencies for the Pytket implementation:
 ```
 pytket
 pytket-qiskit
+pytket-pyquil
 ```
 
 ### Data files
@@ -257,7 +287,7 @@ pip install qiskit qiskit-aer scikit-learn numpy tqdm
 pip install pyquil
 
 # Pytket implementation (in addition)
-pip install pytket pytket-qiskit
+pip install pytket pytket-qiskit pytket-pyquil
 
 # Optional: real IBM hardware
 pip install qiskit-ibm-runtime
@@ -298,6 +328,8 @@ python3 PQC_HEP_training_file_Qiskit.py \
     --batch-size 100 \
     --max-events 2000
 ```
+
+> **Note:** `--batch-size` always takes an integer event count. `BATCH_SIZE_IS_FRACTION` is ignored when `--batch-size` is given on the command line.
 
 ### Running the PyQuil implementations
 
@@ -345,8 +377,9 @@ documented in full detail within each training file.
 | `N_LAYERS` | Number of variational block repetitions per pass |
 | `MAX_EVENTS` | Total training events; `None` uses all available |
 | `BALANCE_CLASSES` | Use equal signal and background event counts; no effect when `MAX_EVENTS=None` |
-| `N_ITER` | Full passes over all training events (epochs) |
-| `BATCH_SIZE` | Events per mini-batch gradient update |
+| `N_ITER` | Full passes over all training events (epochs) (default: 10) |
+| `BATCH_SIZE` | Events per mini-batch gradient update; see `BATCH_SIZE_IS_FRACTION` |
+| `BATCH_SIZE_IS_FRACTION` | If `True`, `BATCH_SIZE` is a fraction of total events (e.g. `0.1`); if `False`, it is an exact integer count |
 | `ALPHA` | Adam learning rate |
 | `USE_STATEVECTOR` | Exact P(\|1⟩) without shot noise — Qiskit only |
 | `Nm` | Shots per evaluation when `USE_STATEVECTOR=False` — Qiskit only |
@@ -359,7 +392,7 @@ Circuits 1–19 are numbered following Figure 2 of Sim et al. (2019) [[5]](#ref-
 qubits and between 4 and 28 trainable parameters per layer application. Key properties:
 
 - **Circuits 1, 2, 9–12, 15**: Only Rx/Ry/Rz gates — all parameters use the two-term rule.
-- **Circuits 3–8, 13–14, 16–19**: Include CRx/CRy/CRz gates — some parameters use the
+- **Circuits 3–8, 13–14, 16–19**: Include CRx or CRz gates — some parameters use the
   four-term rule.
 
 ---

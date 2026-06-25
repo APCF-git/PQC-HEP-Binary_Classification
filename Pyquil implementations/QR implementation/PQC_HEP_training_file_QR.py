@@ -597,8 +597,8 @@ def build_embedding_unitary(amplitudes):
     """
     Build a 16x16 unitary Q via QR decomposition.
     A random complex matrix M is formed with amplitudes as its first column.
-    QR factorisation gives Q with Q[:,0] = amplitudes up to a global phase
-    (physically unobservable). Single LAPACK call, no iterative loop.
+    QR factorisation gives Q with Q[:,0] = ±amplitudes (the sign is a global
+    phase, physically unobservable). Single LAPACK call, no iterative loop.
     """
     n    = len(amplitudes)
     M    = np.random.randn(n, n) + 1j * np.random.randn(n, n)
@@ -627,7 +627,7 @@ def run_circuit_and_measure(gate_def, embed_instr, theta):
     p += gate_def
     p += RESET()
     p += embed_instr
-    p  = variational_form_fn(p, theta, n_layers)
+    p, _ = variational_form_fn(p, theta, n_layers)
     p.wrap_in_numshots_loop(Nm)
     result = qvm.run(p.measure_all()).get_register_map()["ro"]
     return float(np.array(result)[:, 0].mean())
@@ -648,62 +648,27 @@ def compute_loss(p_values, event_labels, event_weights):
 
 # --- Shift rule classification ------------------------------------------------
 
-def classify_shift_rules_pyquil(circuit_fn, n_params, n_layers):
+def gate_names_to_shift_rules(parameterized_gate_names):
     """
-    Probe the variational form circuit with unique sentinel theta values and
-    classify each parameter by which shift rule its gate requires.
-    Called once before training. Returns a list of length n_params:
-    'two_term' or 'four_term'.
-    Raises ValueError for any unrecognised gate type — no silent failure.
-
-    two_term  : plain RX/RY/RZ gates, Pauli generator, eigenvalues {+1,-1}.
-    four_term : CONTROLLED RX/RY/RZ gates, generator eigenvalues {-1,0,+1}.
+    Map gate names returned by the circuit function to parameter shift rules.
+    Gate names 'rx', 'ry', 'rz' map to 'two_term'; 'crx', 'cry', 'crz' to 'four_term'.
+    Raises ValueError for any gate with no known rule — no silent failure.
     """
-    from pyquil import Program
-    from pyquil.quilbase import Gate
-
-    TWO_TERM_NAMES = {'RX', 'RY', 'RZ'}
-
-    probe_theta     = np.arange(1.0, n_params + 1.0)
-    probe_prog      = Program()
-    circuit_fn(probe_prog, probe_theta, n_layers)
-    sentinel_to_idx = {float(i + 1): i for i in range(n_params)}
-
-    param_to_rule = {}
-    for instr in probe_prog.instructions:
-        if not isinstance(instr, Gate) or not instr.params:
-            continue
-        for param_val in instr.params:
-            try:
-                val = float(param_val)
-            except TypeError:
-                try:
-                    val = float(param_val.real)
-                except (AttributeError, TypeError, ValueError):
-                    continue
-            if val not in sentinel_to_idx:
-                continue
-            idx = sentinel_to_idx[val]
-            if instr.name in TWO_TERM_NAMES and not instr.modifiers:
-                param_to_rule[idx] = 'two_term'
-            elif instr.name in TWO_TERM_NAMES and 'CONTROLLED' in instr.modifiers:
-                param_to_rule[idx] = 'four_term'
-            else:
-                raise ValueError(
-                    f"Parameter index {idx} feeds gate '{instr.name}' "
-                    f"(modifiers={instr.modifiers}), which has no known "
-                    f"parameter-shift rule. Add its rule to "
-                    f"classify_shift_rules_pyquil before using it."
-                )
-
-    if len(param_to_rule) != n_params:
-        missing = [i for i in range(n_params) if i not in param_to_rule]
-        raise ValueError(
-            f"Parameter indices {missing} were not matched to any gate. "
-            f"Check that circuit_fn uses all parameters in theta[0..{n_params-1}]."
-        )
-
-    return [param_to_rule[i] for i in range(n_params)]
+    TWO_TERM_GATES  = {'rx', 'ry', 'rz'}
+    FOUR_TERM_GATES = {'crx', 'cry', 'crz'}
+    rules = []
+    for name in parameterized_gate_names:
+        if name in TWO_TERM_GATES:
+            rules.append('two_term')
+        elif name in FOUR_TERM_GATES:
+            rules.append('four_term')
+        else:
+            raise ValueError(
+                f"Gate '{name}' has no known parameter-shift rule. "
+                f"Add its rule to gate_names_to_shift_rules before using it, "
+                f"and add its gradient formula to compute_batch_gradient_and_loss."
+            )
+    return rules
 
 
 # --- Batch gradient via parameter shift rule ---------------------------------
@@ -743,7 +708,7 @@ def compute_batch_gradient_and_loss(batch_embeddings, batch_labels, batch_weight
             p_plus  = np.array([run_circuit_and_measure(gd, ei, tp) for gd, ei in batch_embeddings])
             p_minus = np.array([run_circuit_and_measure(gd, ei, tm) for gd, ei in batch_embeddings])
             dpdtheta = (p_plus - p_minus) / 2.0
-        else:  # four_term
+        elif shift_rules[k] == 'four_term':
             ta_p    = theta.copy(); ta_p[k] += np.pi / 2
             ta_m    = theta.copy(); ta_m[k] -= np.pi / 2
             tb_p    = theta.copy(); tb_p[k] += np.pi
@@ -753,6 +718,11 @@ def compute_batch_gradient_and_loss(batch_embeddings, batch_labels, batch_weight
             f_bp = np.array([run_circuit_and_measure(gd, ei, tb_p) for gd, ei in batch_embeddings])
             f_bm = np.array([run_circuit_and_measure(gd, ei, tb_m) for gd, ei in batch_embeddings])
             dpdtheta = D1 * (f_ap - f_am) - D2 * (f_bp - f_bm)
+        else:
+            raise ValueError(
+                f"Unknown shift rule '{shift_rules[k]}' for parameter {k}. "
+                f"Add its gradient formula to compute_batch_gradient_and_loss."
+            )
         gradients[k] = float(np.dot(dL_dp, dpdtheta) / N)
 
     return gradients, batch_loss
@@ -854,7 +824,9 @@ for x_raw in tqdm(events, desc="Embedding", unit="event", leave=True):
 print()
 
 # Classify each theta parameter by the shift rule its gate requires.
-shift_rules = classify_shift_rules_pyquil(variational_form_fn, N_PARAMS, n_layers)
+_dummy_prog = Program()
+_, parameterized_gate_names = variational_form_fn(_dummy_prog, [0.0] * N_PARAMS, n_layers)
+shift_rules = gate_names_to_shift_rules(parameterized_gate_names)
 _n_two  = shift_rules.count('two_term')
 _n_four = shift_rules.count('four_term')
 print(f"  Shift rule classification: {_n_two} two-term (RX/RY/RZ), "
@@ -928,8 +900,8 @@ for current_iter in range(1, n_iter + 1):
             rng_reshuffle = np.random.default_rng()
         perm           = rng_reshuffle.permutation(N_EVENTS)
         pass_embeddings = [all_embeddings[i] for i in perm]
-        pass_labels   = labels[perm]
-        pass_weights  = weights[perm]
+        pass_labels     = labels[perm]
+        pass_weights    = weights[perm]
     else:
         pass_embeddings = all_embeddings
         pass_labels     = labels
@@ -1160,7 +1132,7 @@ classifier_script = textwrap.dedent(f"""\
                 print_result(classify([float(x) for x in row[:N_FEAT]], qvm), index=i)
     else:
         # Mode 1: classify a single event — replace your_event_features with real values.
-        your_event_features = [0.0] * N_FEAT   # <-- replace with your 12 feature values
+        your_event_features = [1.0] * N_FEAT   # <-- replace with your 12 feature values
         print_result(classify(your_event_features, qvm))
 """)
 

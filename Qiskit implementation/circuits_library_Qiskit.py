@@ -12,7 +12,7 @@ Description:
     Circuit templates follow Figure 2 of Sim et al. (2019) — see references in README.md.
 
 Each circuit function has the following signature:
-    circuit_N(qc, theta, n_layers) -> QuantumCircuit
+    circuit_N(qc, theta, n_layers) -> tuple[QuantumCircuit, list[str]]
 
     qc       : Qiskit QuantumCircuit containing the already-embedded quantum state.
     theta    : 1-D array (or ParameterVector) holding all rotation angles for all
@@ -20,6 +20,13 @@ Each circuit function has the following signature:
                the same function works for numeric evaluation and for building a
                parameterized circuit that can be transpiled once and reused.
     n_layers : number of times the repeatable layer block is applied.
+
+Returns:
+    qc         : the same QuantumCircuit object passed in (modified in-place).
+    parameterized_gate_names : list of strings, one per variational parameter, naming the gate
+                 that consumes that parameter (e.g. 'rx', 'rz', 'crz'). The list
+                 is in parameter order, so parameterized_gate_names[k] is the gate for theta[k].
+                 Non-parameterized gates (cx, cz, h) are not included.
 
 Parameter layout within theta:
     Indices 0 .. fixed_params-1                          : fixed part, applied once.
@@ -43,22 +50,25 @@ circuit label in the source paper (circuit_number=1 selects CIRCUITS[1], etc.).
 # that starts at 0 and increments by 1 each time a rotation gate consumes a
 # parameter from theta. This means theta[0] always goes to the first rotation
 # gate of the first layer, theta[1] to the second, and so on continuously
-# across all layers. The total number of parameters consumed equals
-# fixed_params + n_layers * layer_params, which must match N_PARAMS in the
-# training file. If you add a new circuit, count the rotation gates carefully.
+# across all layers. Exception: Circuit 10 has a 4-parameter pre-layer block
+# (fixed RY gates applied before all layer repetitions), so theta[0]–theta[3]
+# go to that block and theta[4] starts the first layer. The total number of
+# parameters consumed equals fixed_params + n_layers * layer_params, which
+# must match N_PARAMS in the training file. If you add a new circuit, count
+# the rotation gates carefully.
 
 # Gate naming used throughout this library:
 #   qc.rx(theta, q)              : single-qubit X rotation by angle theta on qubit q
 #   qc.ry(theta, q)              : single-qubit Y rotation by angle theta on qubit q
 #   qc.rz(theta, q)              : single-qubit Z rotation by angle theta on qubit q
-#   qc.cx(ctrl, tgt)             : CNOT gate — ctrl is control qubit, tgt is target
-#   qc.cz(q1, q2)                : controlled-Z gate between q1 and q2
-#   qc.h(q)                      : Hadamard gate on qubit q
+#   qc.cx(ctrl, tgt)             : CNOT gate — ctrl is control qubit, tgt is target (no parameter)
+#   qc.cz(q1, q2)                : controlled-Z gate between q1 and q2 (no parameter)
+#   qc.h(q)                      : Hadamard gate on qubit q (no parameter)
 #   qc.crz(theta, ctrl, target)  : controlled-RZ — ctrl is control, target is target
 #   qc.crx(theta, ctrl, target)  : controlled-RX — ctrl is control, target is target
 #
-# All gate methods modify qc in-place, so the function returns the same qc
-# object it received (the return value may be ignored if preferred).
+# Non-parameterized gates (cx, cz, h) are NOT included in the returned parameterized_gate_names list.
+# All gate methods modify qc in-place; the returned qc is the same object as the input.
 
 
 # Circuit 1
@@ -71,17 +81,20 @@ PARAMETERS_PER_LAYER_1 = 8
 
 def circuit_1(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -96,20 +109,23 @@ PARAMETERS_PER_LAYER_2 = 8
 
 def circuit_2(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.cx(i, i-1)
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -126,21 +142,25 @@ PARAMETERS_PER_LAYER_3 = 11
 
 def circuit_3(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.crz(theta[current_parameter], i, i-1)
+            parameterized_gate_names.append('crz')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -157,21 +177,25 @@ PARAMETERS_PER_LAYER_4 = 11
 
 def circuit_4(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.crx(theta[current_parameter], i, i-1)
+            parameterized_gate_names.append('crx')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -193,14 +217,17 @@ PARAMETERS_PER_LAYER_5 = 28
 
 def circuit_5(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         for control_q in range(3, -1, -1):
@@ -208,16 +235,19 @@ def circuit_5(qc, theta, n_layers):
                 if control_q != target_q:
 
                     qc.crz(theta[current_parameter], control_q, target_q)
+                    parameterized_gate_names.append('crz')
                     current_parameter += 1
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -240,14 +270,17 @@ PARAMETERS_PER_LAYER_6 = 28
 
 def circuit_6(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         for control_q in range(3, -1, -1):
@@ -255,16 +288,19 @@ def circuit_6(qc, theta, n_layers):
                 if control_q != target_q:
 
                     qc.crx(theta[current_parameter], control_q, target_q)
+                    parameterized_gate_names.append('crx')
                     current_parameter += 1
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -284,33 +320,41 @@ PARAMETERS_PER_LAYER_7 = 19
 
 def circuit_7(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crz(theta[current_parameter], 1, 0)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         qc.crz(theta[current_parameter], 3, 2)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crz(theta[current_parameter], 2, 1)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -331,33 +375,41 @@ PARAMETERS_PER_LAYER_8 = 19
 
 def circuit_8(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crx(theta[current_parameter], 1, 0)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         qc.crx(theta[current_parameter], 3, 2)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crx(theta[current_parameter], 2, 1)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -374,6 +426,7 @@ PARAMETERS_PER_LAYER_9 = 4
 
 def circuit_9(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
@@ -385,9 +438,10 @@ def circuit_9(qc, theta, n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -406,9 +460,11 @@ PARAMETERS_PER_LAYER_10 = 4
 
 def circuit_10(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for i in range(4):
         qc.ry(theta[current_parameter], i)
+        parameterized_gate_names.append('ry')
         current_parameter += 1
 
     for _ in range(n_layers):
@@ -420,9 +476,10 @@ def circuit_10(qc, theta, n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -440,14 +497,17 @@ PARAMETERS_PER_LAYER_11 = 12
 
 def circuit_11(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.cx(1, 0)
@@ -456,14 +516,16 @@ def circuit_11(qc, theta, n_layers):
 
         for i in range(1, 3):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.cx(2, 1)
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -482,14 +544,17 @@ PARAMETERS_PER_LAYER_12 = 12
 
 def circuit_12(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.cz(1, 0)
@@ -498,14 +563,16 @@ def circuit_12(qc, theta, n_layers):
 
         for i in range(1, 3):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.cz(2, 1)
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -525,35 +592,43 @@ PARAMETERS_PER_LAYER_13 = 16
 
 def circuit_13(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
         qc.crz(theta[current_parameter], 3, 0)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.crz(theta[current_parameter], i-1, i)
+            parameterized_gate_names.append('crz')
             current_parameter += 1
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
         qc.crz(theta[current_parameter], 3, 2)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         qc.crz(theta[current_parameter], 0, 3)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         for i in range(2):
             qc.crz(theta[current_parameter], i+1, i)
+            parameterized_gate_names.append('crz')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -574,35 +649,43 @@ PARAMETERS_PER_LAYER_14 = 16
 
 def circuit_14(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
         qc.crx(theta[current_parameter], 3, 0)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.crx(theta[current_parameter], i-1, i)
+            parameterized_gate_names.append('crx')
             current_parameter += 1
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
         qc.crx(theta[current_parameter], 3, 2)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         qc.crx(theta[current_parameter], 0, 3)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         for i in range(2):
             qc.crx(theta[current_parameter], i+1, i)
+            parameterized_gate_names.append('crx')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -622,11 +705,13 @@ PARAMETERS_PER_LAYER_15 = 8
 
 def circuit_15(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
         qc.cx(3, 0)
@@ -636,6 +721,7 @@ def circuit_15(qc, theta, n_layers):
 
         for i in range(4):
             qc.ry(theta[current_parameter], i)
+            parameterized_gate_names.append('ry')
             current_parameter += 1
 
         qc.cx(3, 2)
@@ -645,7 +731,7 @@ def circuit_15(qc, theta, n_layers):
         for i in range(2):
             qc.cx(i+1, i)
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -664,26 +750,32 @@ PARAMETERS_PER_LAYER_16 = 11
 
 def circuit_16(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crz(theta[current_parameter], 1, 0)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         qc.crz(theta[current_parameter], 3, 2)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         qc.crz(theta[current_parameter], 2, 1)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -703,26 +795,32 @@ PARAMETERS_PER_LAYER_17 = 11
 
 def circuit_17(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crx(theta[current_parameter], 1, 0)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         qc.crx(theta[current_parameter], 3, 2)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         qc.crx(theta[current_parameter], 2, 1)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -740,25 +838,30 @@ PARAMETERS_PER_LAYER_18 = 12
 
 def circuit_18(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
         for i in range(4):
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crz(theta[current_parameter], 3, 0)
+        parameterized_gate_names.append('crz')
         current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.crz(theta[current_parameter], i-1, i)
+            parameterized_gate_names.append('crz')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
@@ -777,25 +880,30 @@ PARAMETERS_PER_LAYER_19 = 12
 
 def circuit_19(qc, theta, n_layers):
     current_parameter = 0
+    parameterized_gate_names = []
 
     for _ in range(n_layers):
 
         for i in range(4):
             qc.rx(theta[current_parameter], i)
+            parameterized_gate_names.append('rx')
             current_parameter += 1
 
         for i in range(4):
             qc.rz(theta[current_parameter], i)
+            parameterized_gate_names.append('rz')
             current_parameter += 1
 
         qc.crx(theta[current_parameter], 3, 0)
+        parameterized_gate_names.append('crx')
         current_parameter += 1
 
         for i in range(3, 0, -1):
             qc.crx(theta[current_parameter], i-1, i)
+            parameterized_gate_names.append('crx')
             current_parameter += 1
 
-    return qc
+    return qc, parameterized_gate_names
 
 
 
