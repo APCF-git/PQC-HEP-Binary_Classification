@@ -167,7 +167,7 @@ training data, regardless of the `MAX_EVENTS` or `BALANCE_CLASSES` settings.
 
 Before training begins, each parameter θₖ is automatically classified by the gate type it
 feeds, and the correct gradient rule is applied per parameter. An unrecognised gate type
-raises a `ValueError` immediately — there is no silent failure.
+raises a `ValueError` immediately. There is no silent failure.
 
 ### Simulation modes (Qiskit only)
 
