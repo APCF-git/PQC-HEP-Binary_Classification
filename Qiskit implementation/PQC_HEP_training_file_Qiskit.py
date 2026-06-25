@@ -107,7 +107,7 @@ from qiskit_aer import AerSimulator
 # Fixed by the physics setup; do not change without matching data and circuits.
 N_QUBITS = 4
 N_FEAT   = 12
-N_DIM    = 2**N_QUBITS    # Hilbert-space dimension = 16
+N_DIM    = 2**N_QUBITS    # Hilbert-space dimension
 
 # Circuits and data.
 # Selects the variational form circuit and specifies where to find the data files.
