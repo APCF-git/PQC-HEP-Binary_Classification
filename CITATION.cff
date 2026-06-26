@@ -16,6 +16,7 @@ authors:
     email: "apcf@topfonseca.com"
 version: "1.0.0"
 date-released: "2026-06-24"
+doi: "10.5281/zenodo.20929885"
 repository-code: "https://github.com/APCF-git/PQC-HEP-Binary_Classification"
 license: MIT
 keywords:

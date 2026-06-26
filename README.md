@@ -1,5 +1,7 @@
 # Parametrized Quantum Circuit for HEP Binary Classification
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20929885.svg)](https://doi.org/10.5281/zenodo.20929885)
+
 **Author:** Adriano Pinto Claro da Fonseca  
 **Email:** apcf@topfonseca.com  
 **Institutional email:** adriano.fonseca@tecnico.ulisboa.pt  
